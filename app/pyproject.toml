@@ -1,0 +1,11 @@
+[project]
+name = "stack-apps"
+version = "0.1.0"
+description = "une stack applicative complète avec Docker Compose"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.128.1",
+    "psycopg>=3.3.2",
+    "uvicorn>=0.40.0",
+]
