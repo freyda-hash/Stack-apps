@@ -1,7 +1,7 @@
-
-import os
 import logging
+import os
 from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException, status
 
@@ -13,13 +13,13 @@ logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
     format="%(asctime)s %(levelname)s %(name)s - %(message)s",
 )
-logger = logging.getLogger("app")
 
+logger = logging.getLogger("app")
 db = Database()
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     logger.info("Starting app version=%s", APP_VERSION)
     logger.info(
         "DB target: host=%s port=%s db=%s user=%s",
@@ -28,7 +28,9 @@ async def lifespan(app: FastAPI):
         db.name,
         db.user,
     )
+
     yield
+
     logger.info("Stopping app version=%s", APP_VERSION)
 
 
@@ -41,30 +43,33 @@ app = FastAPI(
 
 @app.get("/health", status_code=status.HTTP_200_OK)
 def health() -> dict[str, str]:
-    """Vérifie uniquement que l'API est en cours d'exécution"""
+    """Vérifie que le processus de l'API est actif."""
     return {
         "status": "ok",
         "service": "fastapi-app",
     }
 
 
-@app.get("/version")
+@app.get("/version", status_code=status.HTTP_200_OK)
 def version() -> dict[str, str]:
-    """Retourne la version actuellement déployée"""
+    """Retourne la version actuellement déployée."""
     return {"version": APP_VERSION}
 
 
-@app.get("/ready")
+@app.get("/ready", status_code=status.HTTP_200_OK)
 def readiness() -> dict[str, str]:
-    """Vérifie que l'API et sa base de données sont prêtes à servir du trafic"""
+    """Vérifie que l'API et sa base de données sont prêtes."""
     try:
         db.ping()
+
         return {
             "status": "ready",
             "database": "ok",
         }
+
     except Exception as exc:
         logger.exception("Database readiness check failed")
+
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Database unavailable",
