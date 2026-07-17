@@ -1,9 +1,13 @@
 
 import os
 import logging
-from fastapi import FastAPI, HTTPException
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException, status
+
+from config import APP_VERSION
 from db import Database
-from config import *
+
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -11,29 +15,57 @@ logging.basicConfig(
 )
 logger = logging.getLogger("app")
 
-
-app = FastAPI(title="FastAPI Application demo", version=APP_VERSION)
-
 db = Database()
 
-@app.on_event("startup")
-def startup():
-    logger.info("Starting app version=%s", APP_VERSION)
-    logger.info("DB target: host=%s port=%s db=%s user=%s", db.host, db.port, db.name, db.user)
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    logger.info("Starting app version=%s", APP_VERSION)
+    logger.info(
+        "DB target: host=%s port=%s db=%s user=%s",
+        db.host,
+        db.port,
+        db.name,
+        db.user,
+    )
+    yield
+    logger.info("Stopping app version=%s", APP_VERSION)
+
+
+app = FastAPI(
+    title="FastAPI Application Demo",
+    version=APP_VERSION,
+    lifespan=lifespan,
+)
+
+
+@app.get("/health", status_code=status.HTTP_200_OK)
+def health() -> dict[str, str]:
+    """Vérifie uniquement que l'API est en cours d'exécution"""
+    return {
+        "status": "ok",
+        "service": "fastapi-app",
+    }
+
 
 @app.get("/version")
-def version():
+def version() -> dict[str, str]:
+    """Retourne la version actuellement déployée"""
     return {"version": APP_VERSION}
 
-@app.get("/db/ping")
-def db_ping():
+
+@app.get("/ready")
+def readiness() -> dict[str, str]:
+    """Vérifie que l'API et sa base de données sont prêtes à servir du trafic"""
     try:
-        val = db.ping()
-        return {"db": "ok", "result": val}
-    except Exception as e:
-        logger.exception("DB ping failed")
-        raise HTTPException(status_code=503, detail=f"db unavailable: {type(e).__name__}")
+        db.ping()
+        return {
+            "status": "ready",
+            "database": "ok",
+        }
+    except Exception as exc:
+        logger.exception("Database readiness check failed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database unavailable",
+        ) from exc

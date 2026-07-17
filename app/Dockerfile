@@ -1,19 +1,15 @@
 FROM python:3.11-slim
 
 WORKDIR /app
-
 RUN pip install uv 
-
 COPY pyproject.toml uv.lock ./
 
 RUN uv sync 
-
-COPY app ./app
+COPY app /app/
 
 RUN useradd -m appuser
 
 COPY . . 
-
 USER appuser 
 
 EXPOSE 8080
